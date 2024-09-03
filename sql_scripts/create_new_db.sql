@@ -1,0 +1,2 @@
+CREATE DATABASE work_info;
+GRANT ALL PRIVILEGES ON DATABASE work_info TO head;

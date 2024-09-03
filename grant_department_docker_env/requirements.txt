@@ -1,0 +1,7 @@
+apache-airflow[postgres]
+psycopg2-binary
+numpy
+pandas
+openpyxl
+odfpy
+requests

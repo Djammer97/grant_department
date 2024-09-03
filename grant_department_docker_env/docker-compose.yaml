@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:12.0
+    environment:
+      POSTGRES_USER: head
+      POSTGRES_PASSWORD: head_pass
+      POSTGRES_DB: airflow
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - C:/airflow/grant_department/backups:/backups
+
+  airflow-init:
+    image: apache/airflow:2.9.3
+    user: root
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://head:head_pass@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    volumes:
+      - C:/airflow/grant_department/dags:/opt/airflow/dags
+      - C:/airflow/grant_department/logs:/opt/airflow/logs
+      - C:/airflow/grant_department/plugins:/opt/airflow/plugins
+      - C:/airflow/grant_department/backups:/opt/airflow/backups
+      - C:/airflow/grant_department/works_data_source:/opt/airflow/works_data_source
+      - C:/airflow/grant_department/venv:/opt/airflow/venv 
+      - ./requirements.txt:/requirements.txt 
+    entrypoint: >
+      bash -c "
+      python -m venv /opt/airflow/venv &&
+      . /opt/airflow/venv/bin/activate &&
+      pip install --no-cache-dir -r /requirements.txt &&
+      airflow db init &&
+      airflow users create -r Admin -u head -p head_pass -e test@yandex.ru -f first_name -l last_name
+      "
+    depends_on:
+      - postgres
+
+  webserver:
+    image: apache/airflow:2.9.3
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://head:head_pass@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    ports:
+      - "8080:8080"
+    volumes:
+      - C:/airflow/grant_department/dags:/opt/airflow/dags
+      - C:/airflow/grant_department/logs:/opt/airflow/logs
+      - C:/airflow/grant_department/plugins:/opt/airflow/plugins
+      - C:/airflow/grant_department/backups:/opt/airflow/backups
+      - C:/airflow/grant_department/works_data_source:/opt/airflow/works_data_source
+      - C:/airflow/grant_department/venv:/opt/airflow/venv
+    depends_on:
+      - airflow-init
+    command: bash -c ". /opt/airflow/venv/bin/activate && airflow webserver"
+
+  scheduler:
+    image: apache/airflow:2.9.3
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://head:head_pass@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    volumes:
+      - C:/airflow/grant_department/dags:/opt/airflow/dags
+      - C:/airflow/grant_department/logs:/opt/airflow/logs
+      - C:/airflow/grant_department/plugins:/opt/airflow/plugins
+      - C:/airflow/grant_department/backups:/opt/airflow/backups
+      - C:/airflow/grant_department/works_data_source:/opt/airflow/works_data_source
+      - C:/airflow/grant_department/venv:/opt/airflow/venv
+    depends_on:
+      - airflow-init
+    command: bash -c ". /opt/airflow/venv/bin/activate && airflow scheduler"
+
+  metabase:
+    image: metabase/metabase:v0.50.23
+    ports:
+      - "3000:3000"
+    volumes:
+      - metabase_data:/usr/share/metabase
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+  metabase_data:

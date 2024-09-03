@@ -1,0 +1,13 @@
+{
+	"name": "Airflow Development",
+	"dockerComposeFile": "C:/Users/user/Desktop/portfolio/project 'Grant Department'/grant_department_docker_env/docker-compose.yaml",
+	"service": "webserver",
+	"workspaceFolder": "/opt/airflow",
+	"extensions": [
+		"ms-python.python"
+	  ],
+	"settings": {
+	  "python.pythonPath": "/opt/airflow/venv/bin/python"
+	},
+	"postCreateCommand": ". /opt/airflow/venv/bin/activate"
+  }
