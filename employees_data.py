@@ -699,7 +699,7 @@ def dashboard_full_works_create(*args, **kwargs):
                 data = [one_data[0] for one_data in data]
             topics.append(data)
         
-        print('Список работ - ', topics)
+        print('Список работ -', topics)
         
         dashboard_name = 'Результаты работ'
 
@@ -712,13 +712,33 @@ def dashboard_full_works_create(*args, **kwargs):
             token = auth_response.json()['id']
             session.headers.update({"X-Metabase-Session": token})
 
+            # Получаем номер БД, из которой берем данные
+            response = session.get(f"{url}/database")
+            database_id = [one_bd['id'] for one_bd in response.json()['data'] if one_bd['name'] == 'work_info']
+            if not database_id:
+                database_data = {
+                    'engine': 'postgres',
+                    'name': 'work_info',
+                    'details': {
+                        'host': db_dest.host,
+                        'port': db_dest.port,
+                        'dbname': db_dest.schema,
+                        'user': db_dest.login,
+                        'password': db_dest.password
+                    }
+                }
+                response = session.post(f'{url}/database', json=database_data)
+                database_id = response.json()['id']
+                print('Номер новой БД -', database_id)
+            else:
+                database_id = database_id[0]
+                print('Номер БД -', database_id)
+
             # Удаление старого dashboard и карточек запросов
 
             response = session.get(url=f"{url}/dashboard")
                         
             dashboards = response.json()
-
-            print('Получен id dashboard - ', dashboards)
 
             for dashboard in dashboards:
                 if dashboard['name'] == dashboard_name:
@@ -729,12 +749,12 @@ def dashboard_full_works_create(*args, **kwargs):
                     question_ids = [card["id"] for card in response if card['name'].startswith(tuple(card_names))]
 
                     for question in question_ids:
-                        print('Удаляем card с id ', question)
+                        print('Удаляем card с id', question)
                         
                         response = session.delete(url=f'{url}/card/{question}')
                             
                     response = session.delete(f"{url}/dashboard/{dashboard_id}")
-                    print('Удаляем dashboard с id ', dashboard_id)
+                    print('Удаляем dashboard с id', dashboard_id)
                     break
 
             # Создание нового dashboard
@@ -748,19 +768,11 @@ def dashboard_full_works_create(*args, **kwargs):
             new_dashboard = response.json()
             new_dashboard_id = new_dashboard['id'] 
 
-            print('Создаем dashboard с id ', new_dashboard_id)
-
-            # Получаем номер БД, из которой берем данные
-            response = session.get(f"{url}/database")
-            database_id = [one_bd['id'] for one_bd in response.json()['data'] if one_bd['name'] == 'work_info'][0]
-
-            print('Номер БД - ', database_id)
+            print('Создаем dashboard с id', new_dashboard_id)
 
             # Ищем или создаем коллекцию
 
             response = session.get(f'{url}/collection')
-            print(response)
-            print(response.json())
             collection_id = [one_collection['id'] for one_collection in response.json() if one_collection['name'] == collection_name]
             if not collection_id:
                 response = session.post(f"{url}/collection", json={
@@ -768,10 +780,10 @@ def dashboard_full_works_create(*args, **kwargs):
                     }
                 )
                 collection_id = response.json()['id']
+                print('Номер новой коллекции -', collection_id)
             else:
                 collection_id = collection_id[0]
-
-            print('Номер коллекции - ', collection_id)
+                print('Номер коллекции -', collection_id)
             
             # Создаем карточки запросов
             cards_id = []
@@ -806,6 +818,7 @@ def dashboard_full_works_create(*args, **kwargs):
                 response = session.post(f'{url}/card', json=card_data)
 
                 cards_id[counter].append(response.json()['id'])
+                print('Создаем новый card с id', cards_id[counter][-1])
 
                 query = f"""
                     SELECT service_number, SUM(hours) AS hours, name, position
@@ -838,6 +851,7 @@ def dashboard_full_works_create(*args, **kwargs):
                 response = session.post(f'{url}/card', json=card_data)
 
                 cards_id[counter].append(response.json()['id'])
+                print('Создаем новый card с id', cards_id[counter][-1])
 
                 card_data = {
                     "name": f'{one_name} - все (диаграмма)',
@@ -863,6 +877,7 @@ def dashboard_full_works_create(*args, **kwargs):
                 response = session.post(f'{url}/card', json=card_data)
 
                 cards_id[counter].append(response.json()['id'])
+                print('Создаем новый card с id', cards_id[counter][-1])
 
                 for topic in all_topics:
                     query = f"""
@@ -890,6 +905,7 @@ def dashboard_full_works_create(*args, **kwargs):
                     response = session.post(f'{url}/card', json=card_data)
 
                     cards_id[counter].append(response.json()['id'])
+                    print('Создаем новый card с id', cards_id[counter][-1])
 
                     query = f"""
                         SELECT service_number, hours, name, position
@@ -921,6 +937,7 @@ def dashboard_full_works_create(*args, **kwargs):
                     response = session.post(f'{url}/card', json=card_data)
 
                     cards_id[counter].append(response.json()['id'])
+                    print('Создаем новый card с id', cards_id[counter][-1])
 
                     card_data = {
                         "name": f'{one_name} - {topic} (диаграмма)',  
@@ -946,6 +963,7 @@ def dashboard_full_works_create(*args, **kwargs):
                     response = session.post(f'{url}/card', json=card_data)
 
                     cards_id[counter].append(response.json()['id'])
+                    print('Создаем новый card с id', cards_id[counter][-1])
 
                 query = f"""
                     SELECT service_number, "name", "position", topic, standard_hours, note
@@ -971,6 +989,7 @@ def dashboard_full_works_create(*args, **kwargs):
                 response = session.post(f'{url}/card', json=card_data)
 
                 cards_id[counter].append(response.json()['id'])
+                print('Создаем новый card с id', cards_id[counter][-1])
 
             # Создаем вкладки и карточки dashbord-ов
             dashboard_card_data = []
@@ -1050,6 +1069,7 @@ def dashboard_full_works_create(*args, **kwargs):
             }
 
             response = session.put(f"{url}/dashboard/{new_dashboard_id}", json=update_data)
+            print('Обновляем dashboard с id', response.json()['id'])
 
         session.close()
 
