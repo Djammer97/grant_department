@@ -674,6 +674,7 @@ def dashboard_full_works_create(*args, **kwargs):
             'Этот месяц', 
             'Позапрошлый месяц',
         ]
+        collection_name = 'Результаты работ - запросы'
         dates = [
             get_year_month_with_delta(1),
             get_year_month_with_delta(0),
@@ -685,6 +686,7 @@ def dashboard_full_works_create(*args, **kwargs):
             'cdm.works_month_before_previous'
         ]
         topics = []
+
         for one_date in dates:
             query = f"""
                 SELECT DISTINCT topic 
@@ -751,6 +753,25 @@ def dashboard_full_works_create(*args, **kwargs):
             # Получаем номер БД, из которой берем данные
             response = session.get(f"{url}/database")
             database_id = [one_bd['id'] for one_bd in response.json()['data'] if one_bd['name'] == 'work_info'][0]
+
+            print('Номер БД - ', database_id)
+
+            # Ищем или создаем коллекцию
+
+            response = session.get(f'{url}/collection')
+            print(response)
+            print(response.json())
+            collection_id = [one_collection['id'] for one_collection in response.json() if one_collection['name'] == collection_name]
+            if not collection_id:
+                response = session.post(f"{url}/collection", json={
+                    'name': collection_name
+                    }
+                )
+                collection_id = response.json()['id']
+            else:
+                collection_id = collection_id[0]
+
+            print('Номер коллекции - ', collection_id)
             
             # Создаем карточки запросов
             cards_id = []
@@ -769,6 +790,7 @@ def dashboard_full_works_create(*args, **kwargs):
         
                 card_data = {
                     "name": f'{one_name} - все (таблица)',
+                    'collection_id': collection_id,
                     "dataset_query": {
                         "type": "native",
                         "native": {
@@ -795,6 +817,7 @@ def dashboard_full_works_create(*args, **kwargs):
 
                 card_data = {
                     "name": f'{one_name} - все (график)',
+                    'collection_id': collection_id,
                     "dataset_query": {
                         "type": "native",
                         "native": {
@@ -818,6 +841,7 @@ def dashboard_full_works_create(*args, **kwargs):
 
                 card_data = {
                     "name": f'{one_name} - все (диаграмма)',
+                    'collection_id': collection_id,
                     "dataset_query": {
                         "type": "native",
                         "native": {
@@ -850,6 +874,7 @@ def dashboard_full_works_create(*args, **kwargs):
 
                     card_data = {
                         "name": f'{one_name} - {topic} (таблица)',
+                        'collection_id': collection_id,
                         "dataset_query": {
                             "type": "native",
                             "native": {
@@ -875,6 +900,7 @@ def dashboard_full_works_create(*args, **kwargs):
 
                     card_data = {
                         "name": f'{one_name} - {topic} (график)',
+                        'collection_id': collection_id,
                         "dataset_query": {
                             "type": "native",
                             "native": {
@@ -898,6 +924,7 @@ def dashboard_full_works_create(*args, **kwargs):
 
                     card_data = {
                         "name": f'{one_name} - {topic} (диаграмма)',  
+                        'collection_id': collection_id,
                         "dataset_query": {
                             "type": "native",
                             "native": {
@@ -928,6 +955,7 @@ def dashboard_full_works_create(*args, **kwargs):
 
                 card_data = {
                     "name": f'{one_name} - (подробный отчет)',
+                    'collection_id': collection_id,
                     "dataset_query": {
                         "type": "native",
                         "native": {
