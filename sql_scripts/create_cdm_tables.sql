@@ -1,3 +1,5 @@
+SET search_path TO work_info;
+
 DROP TABLE IF EXISTS cdm.full_works_last_months;
 DROP TABLE IF EXISTS cdm.full_works_history;
 DROP TABLE IF EXISTS cdm.load_info;

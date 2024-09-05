@@ -9,6 +9,7 @@ services:
       - "15432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./sql_scripts:/docker-entrypoint-initdb.d 
       - C:/airflow/grant_department/backups:/backups
 
   airflow-init:
@@ -25,6 +26,7 @@ services:
       - C:/airflow/grant_department/backups:/opt/airflow/backups
       - C:/airflow/grant_department/works_data_source:/opt/airflow/works_data_source
       - C:/airflow/grant_department/venv:/opt/airflow/venv 
+      - C:/airflow/grant_department/sql:/opt/airflow/sql 
       - ./requirements.txt:/requirements.txt 
     entrypoint: >
       bash -c "
@@ -51,6 +53,7 @@ services:
       - C:/airflow/grant_department/plugins:/opt/airflow/plugins
       - C:/airflow/grant_department/backups:/opt/airflow/backups
       - C:/airflow/grant_department/works_data_source:/opt/airflow/works_data_source
+      - C:/airflow/grant_department/sql:/opt/airflow/sql 
       - C:/airflow/grant_department/venv:/opt/airflow/venv
     depends_on:
       - airflow-init
@@ -68,6 +71,7 @@ services:
       - C:/airflow/grant_department/plugins:/opt/airflow/plugins
       - C:/airflow/grant_department/backups:/opt/airflow/backups
       - C:/airflow/grant_department/works_data_source:/opt/airflow/works_data_source
+      - C:/airflow/grant_department/sql:/opt/airflow/sql 
       - C:/airflow/grant_department/venv:/opt/airflow/venv
     depends_on:
       - airflow-init

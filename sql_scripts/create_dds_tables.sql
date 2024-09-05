@@ -1,3 +1,5 @@
+SET search_path TO work_info;
+
 DROP TABLE IF EXISTS dds.logs CASCADE;
 DROP TABLE IF EXISTS dds.fct_works CASCADE;
 DROP TABLE IF EXISTS dds.dm_topics CASCADE;

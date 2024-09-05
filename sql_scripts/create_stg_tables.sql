@@ -1,3 +1,5 @@
+SET search_path TO work_info;
+
 DROP TABLE IF EXISTS stg.headsectors_info;
 DROP TABLE IF EXISTS stg.employees;
 DROP TABLE IF EXISTS stg.standard;

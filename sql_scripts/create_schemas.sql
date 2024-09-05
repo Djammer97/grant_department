@@ -1,3 +1,5 @@
+SET search_path TO work_info;
+
 DROP SCHEMA IF EXISTS stg;
 DROP SCHEMA IF EXISTS dds;
 DROP SCHEMA IF EXISTS cdm;

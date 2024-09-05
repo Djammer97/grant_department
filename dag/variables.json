@@ -1,0 +1,23 @@
+{
+    "metabase": {
+        "password": "Zz12345",
+        "site_name":"Удивительный отдел",
+        "email":"nicetoseeyou@gmail.ru",
+        "last_name":"Яблочков",
+        "first_name":"Джонни",
+        "site_locale":"ru",
+        "conn_id":"METABASE_DASHBOARDS_CONNECTION",
+        "conn_type":"http",
+        "host":"metabase",
+        "port":3000
+    },
+    "postgres": {
+        "conn_id":"BD_WORK_INFO",
+        "conn_type":"postgres",
+        "host":"postgres",
+        "login":"head",
+        "password":"head_pass",
+        "port":5432,
+        "schema":"work_info"
+    }
+}
