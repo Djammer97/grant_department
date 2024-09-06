@@ -82,7 +82,7 @@ WITH employees_hiring_dates AS(
     FROM info_with_flags a
     LEFT JOIN info_with_flags b ON a.service_number = b.service_number AND a.active_to = b.active_from
 ), not_filtered AS (
-    SELECT service_number, name, position_from, active_from AS date_update, 
+    SELECT service_number, name, position_from AS position, active_from AS date_update, 
     	'hire' AS change_info, 
     	'На должность "' || position_from || '"' AS note
     FROM info_with_flags_and_positions

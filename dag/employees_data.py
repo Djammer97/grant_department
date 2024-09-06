@@ -1073,6 +1073,219 @@ def dashboard_full_works_create(*args, **kwargs):
 
         session.close()
 
+def statistic_employees_works_create(*args, **kwargs):
+    headers={
+        'username': metabase_dest.login,
+        'password': metabase_dest.password,
+        "Content-Type": "application/json",
+    }
+
+    url = f'http://{metabase_dest.host}:{metabase_dest.port}/api'
+    collection_name = 'Статистика сотрудников - запросы'
+    dashboard_name = 'Статистика сотрудников'
+
+    session = requests.Session()
+    auth_response = session.post(f'{url}/session', json=headers)
+
+    if auth_response.ok:
+        print('Авторизация прошла успешно')
+
+        token = auth_response.json()['id']
+        session.headers.update({"X-Metabase-Session": token})
+
+        # Получаем номер БД, из которой берем данные
+        response = session.get(f"{url}/database")
+        database_id = [one_bd['id'] for one_bd in response.json()['data'] if one_bd['name'] == 'work_info']
+        if not database_id:
+            database_data = {
+                'engine': 'postgres',
+                'name': 'work_info',
+                'details': {
+                    'host': db_dest.host,
+                    'port': db_dest.port,
+                    'dbname': db_dest.schema,
+                    'user': db_dest.login,
+                    'password': db_dest.password
+                }
+            }
+            response = session.post(f'{url}/database', json=database_data)
+            database_id = response.json()['id']
+            print('Номер новой БД -', database_id)
+        else:
+            database_id = database_id[0]
+            print('Номер БД -', database_id)
+
+        # Проверка существования dashboard
+
+        response = session.get(url=f"{url}/dashboard")
+                    
+        dashboards = response.json()
+
+        for dashboard in dashboards:
+            if dashboard['name'] == dashboard_name:
+                print('dashboard', dashboard_name, 'уже существует')
+                return
+
+        # Создание нового dashboard
+
+        dashboard_data = {
+            "name": dashboard_name,  
+            "description": "Статистика по сотрудникам за год"
+        }
+
+        response = session.post(f"{url}/dashboard", json=dashboard_data)
+        new_dashboard = response.json()
+        new_dashboard_id = new_dashboard['id'] 
+
+        print('Создаем dashboard с id', new_dashboard_id)
+
+        # Ищем или создаем коллекцию
+
+        response = session.get(f'{url}/collection')
+        collection_id = [one_collection['id'] for one_collection in response.json() if one_collection['name'] == collection_name]
+        if not collection_id:
+            response = session.post(f"{url}/collection", json={
+                'name': collection_name
+                }
+            )
+            print(response)
+            collection_id = response.json()['id']
+            print('Номер новой коллекции -', collection_id)
+        else:
+            collection_id = collection_id[0]
+            print('Номер коллекции -', collection_id)
+        
+        # Создаем карточки запросов
+        cards_id = []
+
+        query = f"""
+            SELECT service_number, name, position, date_update, change_info, note
+            FROM cdm.position_statistic
+            ORDER BY service_number, date_update
+        """
+
+        card_data = {
+            "name": f'{dashboard_name} (таблица)',
+            'collection_id': collection_id,
+            "dataset_query": {
+                "type": "native",
+                "native": {
+                    "query": query,
+                    "template-tags": {}
+                },
+                "database": database_id
+            },
+            "display": "table",
+            "visualization_settings": {}
+        }
+    
+        response = session.post(f'{url}/card', json=card_data)
+
+        cards_id.append(response.json()['id'])
+        print('Создаем новый card с id', cards_id[-1])
+
+        query = f"""
+            SELECT change_info, COUNT(*) AS amount
+            FROM cdm.position_statistic
+            GROUP BY change_info
+        """
+
+        card_data = {
+            "name": f'{dashboard_name} (суммы)',
+            'collection_id': collection_id,
+            "dataset_query": {
+                "type": "native",
+                "native": {
+                    "query": query,
+                    "template-tags": {}
+                },
+                "database": database_id
+            },
+            "display": "table",
+            "visualization_settings": {}
+        }
+
+        response = session.post(f'{url}/card', json=card_data)
+
+        cards_id.append(response.json()['id'])
+        print('Создаем новый card с id', cards_id[-1])
+
+        card_data = {
+            "name": f'{dashboard_name} (график)',
+            'collection_id': collection_id,
+            "dataset_query": {
+                "type": "native",
+                "native": {
+                    "query": query,
+                    "template-tags": {}
+                },
+                "database": database_id
+            },
+            "display": "pie",
+            "visualization_settings": {
+                "pie.dimension": "change_info",  
+                "pie.metric": "amount",
+                "pie.slice_order": "alphabetical",
+                "pie.show_slices_values": True,
+                "pie.slice_threshold": 0
+            }
+        }
+
+        response = session.post(f'{url}/card', json=card_data)
+
+        cards_id.append(response.json()['id'])
+        print('Создаем новый card с id', cards_id[-1])
+
+        # Создаем вкладки и карточки dashbord-ов
+        dashboard_card_data = []
+        dashboard_card_data.append({
+            "id": cards_id[0],
+            'card_id': cards_id[0], 
+            "size_x": 24,
+            "size_y": 7,
+            "row": 0,
+            "col": 0,                
+            "parameter_mappings": [],
+            "series": []
+        }
+        )
+        dashboard_card_data.append({
+            "id": cards_id[1],
+            'card_id': cards_id[1], 
+            "size_x": 6,
+            "size_y": 4,
+            "row": 7,
+            "col": 0,                
+            "parameter_mappings": [],
+            "series": []
+        }
+        )
+        dashboard_card_data.append({
+            "id": cards_id[2],
+            'card_id': cards_id[2], 
+            "size_x": 10,
+            "size_y": 7,
+            "row": 7,
+            "col": 6,                
+            "parameter_mappings": [],
+            "series": []
+        }
+        )
+
+        # Обновление данных dashboard-а
+        update_data = {
+            "name": new_dashboard.get("name"),
+            "description": new_dashboard.get("description", ""),
+            "tabs": [],
+            "dashcards": dashboard_card_data,  
+            'width': 'full'       
+        }
+
+        response = session.put(f"{url}/dashboard/{new_dashboard_id}", json=update_data)
+        print('Обновляем dashboard с id', response.json()['id'])
+
+    session.close()
+
 default_args = {
     'owner': 'Djammer',
     'retries': 3,
@@ -1135,68 +1348,71 @@ headsectors_info_stg_upload = PythonOperator(
     dag=dag
 )
 
-standard_points_dm_update = PythonOperator(
-    task_id='dm_standard_points_update',
-    python_callable=dm_standard_points_and_employees_update,
-    op_kwargs = {
-        'dest_table': 'dds.dm_standard_points',
-        'unique_field': 'standard_id',
-        'source_table': 'stg.standard',
-        'load_table_key': 'standard_last_date',
-        'source_columns': ['standard_id', 'ratio', 'standard_text'],
-        'date_column': 'last_update_date',
-        'dest_columns': ['standard_id', 'ratio', 'standard_text', 'active_from', 'active_to'],
-    },
-    dag=dag
-)
+with TaskGroup(group_id='dds_upload', dag=dag) as dds_upload:
+    standard_points_dm_update = PythonOperator(
+        task_id='dm_standard_points_update',
+        python_callable=dm_standard_points_and_employees_update,
+        op_kwargs = {
+            'dest_table': 'dds.dm_standard_points',
+            'unique_field': 'standard_id',
+            'source_table': 'stg.standard',
+            'load_table_key': 'standard_last_date',
+            'source_columns': ['standard_id', 'ratio', 'standard_text'],
+            'date_column': 'last_update_date',
+            'dest_columns': ['standard_id', 'ratio', 'standard_text', 'active_from', 'active_to'],
+        },
+        dag=dag
+    )
 
-tg2 = TaskGroup(
-    group_id='dm_tables_upload',
-    dag=dag
-)
+    tg2 = TaskGroup(
+        group_id='dm_tables_upload',
+        dag=dag
+    )
 
-topics_dm_update = PythonOperator(
-    task_id='dm_topics_update',
-    python_callable=dm_topics_update,
-    dag=dag,
-    task_group=tg2
-)
+    topics_dm_update = PythonOperator(
+        task_id='dm_topics_update',
+        python_callable=dm_topics_update,
+        dag=dag,
+        task_group=tg2
+    )
 
-dates_dm_update = PythonOperator(
-    task_id='dm_dates_update',
-    python_callable=dm_dates_update,
-    dag=dag,
-    task_group=tg2
-)
+    dates_dm_update = PythonOperator(
+        task_id='dm_dates_update',
+        python_callable=dm_dates_update,
+        dag=dag,
+        task_group=tg2
+    )
 
-works_info_dm_update = PythonOperator(
-    task_id='dm_works_info_update',
-    python_callable=dm_works_info_update,
-    dag=dag,
-    task_group=tg2
-)
+    works_info_dm_update = PythonOperator(
+        task_id='dm_works_info_update',
+        python_callable=dm_works_info_update,
+        dag=dag,
+        task_group=tg2
+    )
 
-employees_dm_update = PythonOperator(
-    task_id='dm_employees_update',
-    python_callable=dm_standard_points_and_employees_update,
-    dag=dag,
-    op_kwargs = {
-        'dest_table': 'dds.dm_employees',
-        'unique_field': 'service_number',
-        'source_table': 'stg.employees',
-        'load_table_key': 'employees_last_date',
-        'source_columns': ['name', 'position', 'service_number'],
-        'date_column': 'last_update_date',
-        'dest_columns': ['name', 'position', 'service_number', 'active_from', 'active_to'],
-    },
-    task_group=tg2
-)
+    employees_dm_update = PythonOperator(
+        task_id='dm_employees_update',
+        python_callable=dm_standard_points_and_employees_update,
+        dag=dag,
+        op_kwargs = {
+            'dest_table': 'dds.dm_employees',
+            'unique_field': 'service_number',
+            'source_table': 'stg.employees',
+            'load_table_key': 'employees_last_date',
+            'source_columns': ['name', 'position', 'service_number'],
+            'date_column': 'last_update_date',
+            'dest_columns': ['name', 'position', 'service_number', 'active_from', 'active_to'],
+        },
+        task_group=tg2
+    )
 
-works_fct_update = PythonOperator(
-    task_id='fct_works_update',
-    python_callable=fct_works_update,
-    dag=dag,
-)
+    works_fct_update = PythonOperator(
+        task_id='fct_works_update',
+        python_callable=fct_works_update,
+        dag=dag,
+    )
+
+    standard_points_dm_update >> tg2 >> works_fct_update
 
 cdm_full_works_fullfil = PythonOperator(
     task_id='cdm_full_works_fullfil',
@@ -1204,10 +1420,19 @@ cdm_full_works_fullfil = PythonOperator(
     dag=dag
 )
 
-full_works_dashboard_create = PythonOperator(
-    task_id = 'dashboard_full_works_create',
-    python_callable=dashboard_full_works_create,
-    dag=dag,
-)
+with TaskGroup(group_id='dashboards_create', dag=dag) as dashboards_create:
+    full_works_dashboard_create = PythonOperator(
+        task_id = 'dashboard_full_works_create',
+        python_callable=dashboard_full_works_create,
+        dag=dag,
+    )
 
-backup_task >> tg1 >> standard_points_dm_update >> tg2 >> works_fct_update >> cdm_full_works_fullfil >> full_works_dashboard_create
+    employees_statistic_dashboard_create = PythonOperator(
+        task_id = 'dashboard_employees_statistic_create',
+        python_callable=statistic_employees_works_create,
+        dag=dag,
+    )
+
+    full_works_dashboard_create >> employees_statistic_dashboard_create
+
+backup_task >> tg1 >> dds_upload >> cdm_full_works_fullfil >> dashboards_create
