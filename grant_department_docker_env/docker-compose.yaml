@@ -86,6 +86,19 @@ services:
     depends_on:
       - postgres
 
+  pgadmin:
+      image: dpage/pgadmin4:6.8  
+      environment:
+        PGADMIN_DEFAULT_EMAIL: nicetoseeyou@gmail.ru  
+        PGADMIN_DEFAULT_PASSWORD: Zz12345         
+      ports:
+        - "5050:80"  
+      depends_on:
+        - postgres
+      volumes:
+        - pgadmin_data:/var/lib/pgadmin  
+
 volumes:
+  pgadmin_data:  
   postgres_data:
   metabase_data:

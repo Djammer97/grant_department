@@ -57,10 +57,6 @@ def registration_on_metabase(*args, **kwargs):
 
     requests.post('http://metabase:3000/api/setup', json=data)
 
-def self_destruction(*args, **kwargs):
-    os.remove('/opt/airflow/dags/variables.json')
-    os.remove('/opt/airflow/dags/system_init.py')
-
 default_args = {
     'owner': 'Djammer',
     'retries': 3,
@@ -68,88 +64,94 @@ default_args = {
     'start_date': datetime(year=2000, month=1, day=1, hour=9, minute=0, second=0)
 }
 
-dag = DAG(
-    dag_id='system_init', 
-    schedule_interval='0 6 * * *',
+airflow_dag = DAG(
+    dag_id='init_airflow', 
+    schedule_interval=None,
     catchup=False, 
     default_args=default_args
 )
 
-with TaskGroup(group_id='connections_create', dag=dag) as connections_create:
-    postgres_connection_create = PythonOperator(
-        task_id = 'postgres_connection_create',
-        python_callable=create_connction,
-        dag=dag,
-        op_kwargs={
-            'conn_id': variables['postgres']['conn_id'],
-            'conn_type': variables['postgres']['conn_type'],
-            'host': variables['postgres']['host'],
-            'login': variables['postgres']['login'],
-            'password': variables['postgres']['password'],
-            'port': variables['postgres']['port'],
-            'schema': variables['postgres']['schema']
-        }
-    )
+metabase_dag = DAG(
+    dag_id='init_metabase', 
+    schedule_interval=None,
+    catchup=False, 
+    default_args=default_args
+)
 
-    metabase_connection_create = PythonOperator(
-        task_id = 'metabase_connection_create',
-        python_callable=create_connction,
-        dag=dag,
-        op_kwargs={
-            'conn_id': variables['metabase']['conn_id'],
-            'conn_type': variables['metabase']['conn_type'],
-            'host': variables['metabase']['host'],
-            'login': variables['metabase']['email'],
-            'password': variables['metabase']['password'],
-            'port': variables['metabase']['port'],
-            'schema': '',
-        }
-    )
+postgres_dag = DAG(
+    dag_id='init_postgres', 
+    schedule_interval=None,
+    catchup=False,
+    default_args=default_args
+)
 
-with TaskGroup(group_id='sql_init', dag=dag) as sql_init:
-    create_schemas = SQLExecuteQueryOperator(
-        task_id='create_schemas',
+postgres_connection_create = PythonOperator(
+    task_id = 'postgres_connection_create',
+    python_callable=create_connction,
+    dag=airflow_dag,
+    op_kwargs={
+        'conn_id': variables['postgres']['conn_id'],
+        'conn_type': variables['postgres']['conn_type'],
+        'host': variables['postgres']['host'],
+        'login': variables['postgres']['login'],
+        'password': variables['postgres']['password'],
+        'port': variables['postgres']['port'],
+        'schema': variables['postgres']['schema']
+    }
+)
+
+metabase_connection_create = PythonOperator(
+    task_id = 'metabase_connection_create',
+    python_callable=create_connction,
+    dag=airflow_dag,
+    op_kwargs={
+        'conn_id': variables['metabase']['conn_id'],
+        'conn_type': variables['metabase']['conn_type'],
+        'host': variables['metabase']['host'],
+        'login': variables['metabase']['email'],
+        'password': variables['metabase']['password'],
+        'port': variables['metabase']['port'],
+        'schema': '',
+    }
+)
+
+create_schemas = SQLExecuteQueryOperator(
+    task_id='create_schemas',
+    conn_id=variables['postgres']['conn_id'],
+    sql=open('/opt/airflow/sql/create_schemas.sql').read(),
+    dag=postgres_dag
+)
+
+with TaskGroup(group_id='create_layers', dag=postgres_dag) as create_layers:
+    stg = SQLExecuteQueryOperator(
+        task_id='stg',
         conn_id=variables['postgres']['conn_id'],
-        sql=open('/opt/airflow/sql/create_schemas.sql').read(),
-        dag=dag
+        sql=open('/opt/airflow/sql/create_stg_tables.sql').read(),
+        dag=postgres_dag
     )
 
-    with TaskGroup(group_id='create_layers', dag=dag) as create_layers:
-        stg = SQLExecuteQueryOperator(
-            task_id='stg',
-            conn_id=variables['postgres']['conn_id'],
-            sql=open('/opt/airflow/sql/create_stg_tables.sql').read(),
-            dag=dag
-        )
+    dds = SQLExecuteQueryOperator(
+        task_id='dds',
+        conn_id=variables['postgres']['conn_id'],
+        sql=open('/opt/airflow/sql/create_dds_tables.sql').read(),
+        dag=postgres_dag
+    )
 
-        dds = SQLExecuteQueryOperator(
-            task_id='dds',
-            conn_id=variables['postgres']['conn_id'],
-            sql=open('/opt/airflow/sql/create_dds_tables.sql').read(),
-            dag=dag
-        )
+    cdm = SQLExecuteQueryOperator(
+        task_id='cdm',
+        conn_id=variables['postgres']['conn_id'],
+        sql=open('/opt/airflow/sql/create_cdm_tables.sql').read(),
+        dag=postgres_dag
+    )
 
-        cdm = SQLExecuteQueryOperator(
-            task_id='cdm',
-            conn_id=variables['postgres']['conn_id'],
-            sql=open('/opt/airflow/sql/create_cdm_tables.sql').read(),
-            dag=dag
-        )
-
-        stg >> dds >> cdm
-
-    create_schemas >> create_layers
+    stg >> dds >> cdm
 
 metabase_registration = PythonOperator(
     task_id='metabase_registration',
     python_callable=registration_on_metabase,
-    dag=dag
+    dag=metabase_dag
 )
 
-self_destroy = PythonOperator(
-    task_id='self_destroy',
-    python_callable=self_destruction,
-    dag=dag
-)
-
-connections_create >> sql_init >> metabase_registration >> self_destroy
+postgres_connection_create 
+create_schemas >> create_layers 
+metabase_registration
